@@ -17,6 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/useAuthStore';
+import apiClient from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme';
 
@@ -36,10 +37,10 @@ type RootStackParamList = {
 type LoginScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Login'>;
 
 export default function LoginScreen() {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [usernameFocused, setUsernameFocused] = useState(false);
+  const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
   const navigation = useNavigation<LoginScreenNavigationProp>();
   const login = useAuthStore((state) => state.login);
@@ -72,17 +73,36 @@ export default function LoginScreen() {
   }, []);
 
   const handleLogin = async () => {
-    if (!username || !password) {
-      showAlert('Hata', 'Kullanıcı adı ve şifre gereklidir.');
+    if (!email || !password) {
+      showAlert('Hata', 'Email ve şifre gereklidir.');
       return;
     }
 
     try {
       setLoading(true);
-      const tempToken = "fake-jwt-token";
-      await login(tempToken, username);
+      const response = await apiClient.post('/Users/login', { email, password });
+
+      // Backend TokenDto: { accessToken: "..." }
+      const token = response.data?.accessToken;
+
+      if (!token) {
+        showAlert('Hata', 'Sunucudan token alınamadı.');
+        return;
+      }
+
+      // Token'ı önce store'a yazıyoruz ki current-user çağrısı authenticated olsun
+      await login(token, email.split('@')[0], email);
+
+      // Gerçek kullanıcı adını current-user'dan çek
+      try {
+        const userRes = await apiClient.get('/Users/current-user');
+        const realName = userRes.data?.userName || userRes.data?.username || email.split('@')[0];
+        await login(token, realName, email);
+      } catch (_) {
+        // current-user başarısız olursa email prefix'iyle devam et
+      }
     } catch (error: any) {
-      showAlert('Giriş Başarısız', error.response?.data?.message || 'Bir hata oluştu');
+      showAlert('Giriş Başarısız', error.response?.data?.message || 'Email veya şifre hatalı.');
     } finally {
       setLoading(false);
     }
@@ -132,29 +152,30 @@ export default function LoginScreen() {
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }],
           }]}>
-            {/* Username */}
+            {/* Email */}
             <View style={styles.fieldGroup}>
-              <Text style={styles.label}>KULLANICI ADI</Text>
+              <Text style={styles.label}>EMAIL</Text>
               <View style={[
                 styles.inputRow,
-                usernameFocused && styles.inputRowFocused,
+                emailFocused && styles.inputRowFocused,
               ]}>
                 <Ionicons
-                  name="person-outline"
+                  name="mail-outline"
                   size={20}
-                  color={usernameFocused ? Colors.primaryLight : Colors.textMuted}
+                  color={emailFocused ? Colors.primaryLight : Colors.textMuted}
                   style={styles.inputIcon}
                 />
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Kullanıcı adınız..."
+                  placeholder="Email adresiniz..."
                   placeholderTextColor={Colors.textDim}
-                  value={username}
-                  onChangeText={setUsername}
+                  value={email}
+                  onChangeText={setEmail}
                   autoCapitalize="none"
+                  keyboardType="email-address"
                   autoCorrect={false}
-                  onFocus={() => setUsernameFocused(true)}
-                  onBlur={() => setUsernameFocused(false)}
+                  onFocus={() => setEmailFocused(true)}
+                  onBlur={() => setEmailFocused(false)}
                 />
               </View>
             </View>

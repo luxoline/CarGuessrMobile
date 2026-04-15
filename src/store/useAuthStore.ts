@@ -4,14 +4,15 @@ import { Platform } from 'react-native';
 
 interface AuthState {
   token: string | null;
-  username: string | null;
+  username: string | null;  // display name (userName field from backend)
+  email: string | null;
   isAuthenticated: boolean;
-  login: (token: string, username: string) => Promise<void>;
+  login: (token: string, username: string, email: string) => Promise<void>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
 
-// SecureStore doesn't work on web — use a simple fallback
+// SecureStore web'de çalışmaz — fallback
 const storage = {
   setItem: async (key: string, value: string) => {
     if (Platform.OS === 'web') {
@@ -38,25 +39,29 @@ const storage = {
 export const useAuthStore = create<AuthState>((set) => ({
   token: null,
   username: null,
+  email: null,
   isAuthenticated: false,
 
-  login: async (token, username) => {
+  login: async (token, username, email) => {
     await storage.setItem('token', token);
     await storage.setItem('username', username);
-    set({ token, username, isAuthenticated: true });
+    await storage.setItem('email', email);
+    set({ token, username, email, isAuthenticated: true });
   },
 
   logout: async () => {
     await storage.deleteItem('token');
     await storage.deleteItem('username');
-    set({ token: null, username: null, isAuthenticated: false });
+    await storage.deleteItem('email');
+    set({ token: null, username: null, email: null, isAuthenticated: false });
   },
 
   checkAuth: async () => {
     const token = await storage.getItem('token');
     const username = await storage.getItem('username');
+    const email = await storage.getItem('email');
     if (token) {
-      set({ token, username, isAuthenticated: true });
+      set({ token, username, email, isAuthenticated: true });
     }
   },
 }));

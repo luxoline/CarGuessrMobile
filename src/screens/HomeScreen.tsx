@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/useAuthStore';
+import apiClient from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme';
 
@@ -19,6 +20,7 @@ type RootStackParamList = {
   Home: undefined;
   Game: undefined;
   Leaderboard: undefined;
+  Profile: undefined;
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -27,6 +29,8 @@ export default function HomeScreen() {
   const logout = useAuthStore((state) => state.logout);
   const username = useAuthStore((state) => state.username);
   const navigation = useNavigation<HomeScreenNavigationProp>();
+
+  const [userStats, setUserStats] = useState<{ highScore: number; gameCount: number } | null>(null);
 
   // Staggered animations
   const headerAnim = useRef(new Animated.Value(0)).current;
@@ -51,6 +55,22 @@ export default function HomeScreen() {
       animate(statsAnim, statsSlide, 0),
       animate(menuAnim, menuSlide, 0),
     ]).start();
+
+    // current-user endpoint'inden gerçek stats çek
+    const fetchCurrentUser = async () => {
+      try {
+        const res = await apiClient.get('/Users/current-user');
+        const data = res.data;
+        // CurrentUserDto: { userName, totalPoint, gameCount }
+        setUserStats({
+          highScore: data?.totalPoint ?? 0,
+          gameCount: data?.gameCount ?? 0,
+        });
+      } catch (e) {
+        // Sessizce devam et — stats gösterilmez
+      }
+    };
+    fetchCurrentUser();
   }, []);
 
   return (
@@ -123,14 +143,18 @@ export default function HomeScreen() {
               <Ionicons name="trophy" size={20} color={Colors.success} />
             </View>
             <Text style={styles.statLabel}>EN YÜKSEK SKOR</Text>
-            <Text style={styles.statValue}>2,450</Text>
+            <Text style={styles.statValue}>
+              {userStats != null ? userStats.highScore.toLocaleString() : '—'}
+            </Text>
           </View>
           <View style={[styles.statCard, Shadows.sm]}>
             <View style={[styles.statIconBg, { backgroundColor: Colors.warningMuted }]}>
               <Ionicons name="flame" size={20} color={Colors.warning} />
             </View>
             <Text style={styles.statLabel}>OYUN SAYISI</Text>
-            <Text style={styles.statValue}>12</Text>
+            <Text style={styles.statValue}>
+              {userStats != null ? userStats.gameCount : '—'}
+            </Text>
           </View>
         </Animated.View>
 
@@ -162,6 +186,7 @@ export default function HomeScreen() {
           <TouchableOpacity
             style={[styles.menuItem, Shadows.sm]}
             activeOpacity={0.7}
+            onPress={() => navigation.navigate('Profile')}
           >
             <LinearGradient
               colors={['rgba(148,163,184,0.15)', 'rgba(148,163,184,0.05)']}

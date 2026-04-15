@@ -5,19 +5,13 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import apiClient from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme';
 
 export default function LeaderboardScreen() {
-  const [loading] = useState(false);
-  const [leaderboard] = useState<any[]>([
-    { username: 'TopPlayer', score: 15420 },
-    { username: 'CarLover', score: 12800 },
-    { username: 'GuessMaster', score: 11200 },
-    { username: 'TurboSpeed', score: 9800 },
-    { username: 'NitroKing', score: 8500 },
-    { username: 'DriftQueen', score: 7200 },
-  ]);
+  const [loading, setLoading] = useState(true);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const navigation = useNavigation();
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -28,6 +22,22 @@ export default function LeaderboardScreen() {
       Animated.timing(fadeAnim, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(slideAnim, { toValue: 0, duration: 500, useNativeDriver: true }),
     ]).start();
+
+    const fetchLeaderboard = async () => {
+      try {
+        const response = await apiClient.get('/Users/leaderboard?Page=1&Size=20');
+        // Response: { totalCount: number, items: LeaderboardDto[] }
+        // LeaderboardDto: { id, userName, totalScored }
+        const items = response.data?.items ?? response.data ?? [];
+        setLeaderboard(Array.isArray(items) ? items : []);
+      } catch (error) {
+        console.log('Failed to fetch leaderboard', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchLeaderboard();
   }, []);
 
   const getRankIcon = (index: number) => {
@@ -105,19 +115,21 @@ export default function LeaderboardScreen() {
 
                   {/* Avatar */}
                   <LinearGradient colors={getAvatarColors(index)} style={s.avatar}>
-                    <Text style={s.avatarText}>{item.username.charAt(0).toUpperCase()}</Text>
+                    <Text style={s.avatarText}>
+                      {(item.userName || item.username || '?').charAt(0).toUpperCase()}
+                    </Text>
                   </LinearGradient>
 
                   {/* Info */}
                   <View style={s.userInfo}>
-                    <Text style={s.userName}>{item.username}</Text>
+                    <Text style={s.userName}>{item.userName || item.username || 'Bilinmeyen'}</Text>
                     <Text style={s.userTitle}>Usta Tahminci</Text>
                   </View>
 
                   {/* Score */}
                   <View style={s.scoreWrap}>
                     <Text style={[s.scoreVal, index < 3 && s.scoreTop3]}>
-                      {item.score.toLocaleString()}
+                      {(item.totalScored ?? item.totalScore ?? item.score ?? 0).toLocaleString()}
                     </Text>
                     <Text style={s.scoreLbl}>PUAN</Text>
                   </View>

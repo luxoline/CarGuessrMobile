@@ -16,6 +16,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import apiClient from '../api/client';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme';
 
@@ -37,6 +38,7 @@ type RegisterScreenNavigationProp = NativeStackNavigationProp<RootStackParamList
 
 export default function RegisterScreen() {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,7 +73,7 @@ export default function RegisterScreen() {
   }, []);
 
   const handleRegister = async () => {
-    if (!username || !password || !confirmPassword) {
+    if (!username || !email || !password || !confirmPassword) {
       showAlert('Hata', 'Lütfen tüm alanları doldurun.');
       return;
     }
@@ -83,6 +85,13 @@ export default function RegisterScreen() {
 
     try {
       setLoading(true);
+      await apiClient.post('/Users', {
+        userName: username,
+        email,
+        password,
+        profilePhoto: null
+      });
+
       showAlert('Başarılı', 'Kayıt başarılı! Şimdi giriş yapabilirsiniz.', () => {
         navigation.navigate('Login');
       });
@@ -175,6 +184,7 @@ export default function RegisterScreen() {
             transform: [{ translateY: slideAnim }],
           }]}>
             {renderInput('username', 'person-outline', 'KULLANICI ADI', 'Kullanıcı adınız...', username, setUsername)}
+            {renderInput('email', 'mail-outline', 'EMAIL', 'Email adresiniz...', email, setEmail)}
             {renderInput('password', 'lock-closed-outline', 'ŞİFRE', 'Şifreniz...', password, setPassword, true)}
             {renderInput('confirm', 'shield-checkmark-outline', 'ŞİFRE TEKRAR', 'Şifrenizi doğrulayın...', confirmPassword, setConfirmPassword, true)}
 
