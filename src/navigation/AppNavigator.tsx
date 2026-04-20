@@ -10,6 +10,8 @@ import HomeScreen from '../screens/HomeScreen';
 import GameScreen from '../screens/GameScreen';
 import LeaderboardScreen from '../screens/LeaderboardScreen';
 import ProfileScreen from '../screens/ProfileScreen';
+import MultiplayerLobbyScreen from '../screens/MultiplayerLobbyScreen';
+import MultiplayerGameScreen from '../screens/MultiplayerGameScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,6 +32,8 @@ export default function AppNavigator() {
             <Stack.Screen name="Game" component={GameScreen} />
             <Stack.Screen name="Leaderboard" component={LeaderboardScreen} />
             <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen name="MultiplayerLobby" component={MultiplayerLobbyScreen} />
+            <Stack.Screen name="MultiplayerGame" component={MultiplayerGameScreen} />
           </>
         ) : (
           // Auth Stack

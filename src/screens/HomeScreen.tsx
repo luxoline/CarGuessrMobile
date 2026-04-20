@@ -19,6 +19,8 @@ import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme
 type RootStackParamList = {
   Home: undefined;
   Game: undefined;
+  MultiplayerLobby: undefined;
+  MultiplayerGame: undefined;
   Leaderboard: undefined;
   Profile: undefined;
 };
@@ -126,6 +128,42 @@ export default function HomeScreen() {
                   <Text style={styles.heroButtonText}>Hemen Başla</Text>
                   <View style={styles.heroPlayIcon}>
                     <Ionicons name="play" size={16} color={Colors.primary} />
+                  </View>
+                </View>
+              </View>
+            </LinearGradient>
+          </TouchableOpacity>
+        </Animated.View>
+
+        {/* Multiplayer Hero Card */}
+        <Animated.View style={{
+          opacity: heroAnim,
+          transform: [{ translateY: heroSlide }],
+          marginTop: Spacing.md
+        }}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => navigation.navigate('MultiplayerLobby')}
+          >
+            <LinearGradient
+              colors={[Colors.primaryDark, Colors.primary]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={[styles.heroCard, Shadows.glow(Colors.primary)]}
+            >
+              {/* Decorative circle */}
+              <View style={[styles.heroCircle, { backgroundColor: 'rgba(255,255,255,0.04)' }]} />
+              <View style={[styles.heroCircleSmall, { backgroundColor: 'rgba(255,255,255,0.03)' }]} />
+
+              <View style={styles.heroContent}>
+                <Text style={[styles.heroLabel, { color: Colors.warning }]}>ONLİNE OYUN</Text>
+                <Text style={styles.heroTitle}>
+                  Arkadaşınla{'\n'}Kapışmaya Hazır Mısın?
+                </Text>
+                <View style={styles.heroButton}>
+                  <Text style={styles.heroButtonText}>Oda Kur / Katıl</Text>
+                  <View style={styles.heroPlayIcon}>
+                    <Ionicons name="people" size={16} color={Colors.primary} />
                   </View>
                 </View>
               </View>
