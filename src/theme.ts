@@ -5,23 +5,23 @@
 
 export const Colors = {
   // Backgrounds
-  bg: '#0B1120',
-  bgCard: '#131B2E',
-  bgCardHover: '#1A2540',
-  bgInput: '#141E33',
-  bgSurface: '#0F172A',
+  bg: '#0E121B', // Darkest navy background
+  bgCard: '#181F2B', // Lighter background for cards
+  bgCardHover: '#23324C', // Slightly lighter for active/pressed cards
+  bgInput: '#131924',
+  bgSurface: '#161e2e',
 
   // Borders
-  border: '#1E293B',
-  borderLight: '#293548',
-  borderFocus: '#6366F1',
+  border: '#2A3649',
+  borderLight: '#35445B',
+  borderFocus: '#0ea5e9',
 
-  // Primary — Electric Indigo
-  primary: '#6366F1',
-  primaryLight: '#818CF8',
-  primaryDark: '#4F46E5',
-  primaryMuted: 'rgba(99, 102, 241, 0.12)',
-  primaryGlow: 'rgba(99, 102, 241, 0.35)',
+  // Primary — Electric Cyan / Blue (from Start Game button)
+  primary: '#0ea5e9',
+  primaryLight: '#38bdf8',
+  primaryDark: '#0284c7',
+  primaryMuted: 'rgba(14, 165, 233, 0.15)',
+  primaryGlow: 'rgba(14, 165, 233, 0.5)',
 
   // Success — Emerald
   success: '#10B981',
@@ -56,10 +56,10 @@ export const Colors = {
 };
 
 export const Gradients = {
-  primary: ['#6366F1', '#8B5CF6'] as const,
-  primaryDark: ['#4F46E5', '#6366F1'] as const,
-  hero: ['#4F46E5', '#7C3AED'] as const,
-  card: ['#131B2E', '#1A2540'] as const,
+  primary: ['#0284c7', '#38bdf8'] as const,
+  primaryDark: ['#0369a1', '#0ea5e9'] as const,
+  hero: ['#23324C', '#181F2B'] as const, // For the "Your Points" card
+  card: ['#181F2B', '#1D283E'] as const,
   success: ['#059669', '#10B981'] as const,
   error: ['#E11D48', '#F43F5E'] as const,
   dark: ['#0B1120', '#131B2E'] as const,

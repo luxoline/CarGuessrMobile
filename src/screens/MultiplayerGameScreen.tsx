@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity, SafeAreaView, ActivityIndicator, Modal } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMultiplayerStore } from '../store/useMultiplayerStore';
 import { useNavigation } from '@react-navigation/native';
@@ -16,14 +15,31 @@ export default function MultiplayerGameScreen() {
     const navigation = useNavigation<any>();
 
     const [selectedAnswerId, setSelectedAnswerId] = useState<number | null>(null);
+    const [timeLeft, setTimeLeft] = useState(15);
+    const [progressWidth, setProgressWidth] = useState(0);
 
-    // Reset answer selection whenever a brand-new question arrives
     useEffect(() => {
         setSelectedAnswerId(null);
+        setTimeLeft(15);
     }, [currentQuestion?.id]);
 
+    useEffect(() => {
+        if (!currentQuestion || roundResult || selectedAnswerId) return;
+
+        if (timeLeft <= 0) {
+            handleAnswerSubmit(-1);
+            return;
+        }
+
+        const timer = setInterval(() => {
+            setTimeLeft(prev => prev - 1);
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, [timeLeft, currentQuestion, roundResult, selectedAnswerId]);
+
     const handleAnswerSubmit = (optionId: number) => {
-        if (selectedAnswerId || roundResult) return; // Prevent multiple submits
+        if (selectedAnswerId || roundResult) return;
         setSelectedAnswerId(optionId);
         submitAnswer(optionId);
     };
@@ -33,34 +49,26 @@ export default function MultiplayerGameScreen() {
         navigation.replace('Home');
     };
 
-    // Determine roles for UI
     const isHost = hostName === username;
     const myName = isHost ? hostName : guestName;
     const myScore = isHost ? hostScore : guestScore;
     const oppName = isHost ? guestName : hostName;
     const oppScore = isHost ? guestScore : hostScore;
+    const amIWaitingForOpponent = selectedAnswerId !== null && !roundResult;
 
     if (gameFinished && gameResult) {
         return (
             <Modal visible={true} transparent animationType="slide">
                 <View style={styles.modalBg}>
                     <View style={styles.modalContent}>
-                        <Ionicons name="trophy" size={64} color={Colors.warning} />
                         <Text style={styles.resultTitle}>Oyun Bitti!</Text>
-                        
                         <View style={styles.resultScores}>
                              <Text style={styles.resultScoreText}>{myName}: {myScore}</Text>
                              <Text style={styles.resultScoreText}>{oppName}: {oppScore}</Text>
                         </View>
-                        
                         <Text style={styles.winnerText}>
-                            {gameResult.winnerId ? (myScore > oppScore ? "Kazandın!" : "Kaybettin...") : "Berabere!"}
+                            {gameResult.winnerId ? (myScore > oppScore ? "Kazandın! 🎉" : "Kaybettin...") : "Berabere!"}
                         </Text>
-                        
-                        {gameResult.winnerId && myScore > oppScore && (
-                            <Text style={styles.rewardText}>+{gameResult.earnedGameMoney} Para Kazandın!</Text>
-                        )}
-                        
                         <TouchableOpacity style={styles.exitButton} onPress={handleExit}>
                             <Text style={styles.exitButtonText}>Ana Sayfaya Dön</Text>
                         </TouchableOpacity>
@@ -72,36 +80,46 @@ export default function MultiplayerGameScreen() {
 
     if (!currentQuestion) {
         return (
-            <SafeAreaView style={[styles.container, styles.center]}>
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
                 <ActivityIndicator size="large" color={Colors.primary} />
-                <Text style={styles.loadingText}>Soru Bekleniyor...</Text>
+                <Text style={{color: Colors.white, marginTop: 20}}>Sonraki tur yükleniyor...</Text>
             </SafeAreaView>
         );
     }
 
+    // Dynamic Top Bar Progress
+    const totalQ = currentQuestion.totalCount || 5;
+    const curQ = currentQuestion.index || 1;
+    const widthPercentage = (curQ / totalQ) * 100;
 
     return (
         <SafeAreaView style={styles.container}>
+            {/* Top Bar */}
             <View style={styles.header}>
-                <View style={styles.scorePill}>
-                    <Text style={styles.scoreName}>{myName}</Text>
-                    <Text style={styles.scoreValue}>{myScore}</Text>
-                </View>
-                <Text style={styles.vsText}>VS</Text>
-                <View style={[styles.scorePill, styles.oppScorePill]}>
-                    <Text style={[styles.scoreName, { color: Colors.error }]}>{oppName}</Text>
-                    <Text style={styles.scoreValue}>{oppScore}</Text>
+                <TouchableOpacity onPress={handleExit} style={styles.exitBtn}>
+                   <Text style={styles.exitBtnText}>← Çıkış</Text>
+                </TouchableOpacity>
+                <Text style={styles.scoreText}>Skor: <Text style={{color: Colors.primary}}>{myScore}</Text></Text>
+                <View style={styles.timerPill}>
+                   <Text style={[styles.timerText, timeLeft <= 5 && {color: Colors.error}]}>{timeLeft}s</Text>
                 </View>
             </View>
 
+            {/* Progress Bar under header */}
             <View style={styles.progressContainer}>
-                <Text style={styles.progressText}>Soru {currentQuestion.index} / {currentQuestion.totalCount}</Text>
+               <View style={styles.progressTrack}>
+                   <View style={[styles.progressFill, { width: `${widthPercentage}%` }]} />
+               </View>
             </View>
 
+            {/* Image */}
             <View style={styles.imageContainer}>
                 <Image source={{ uri: currentQuestion.photo }} style={styles.image} resizeMode="cover" />
             </View>
 
+            <Text style={styles.questionTitle}>Bu hangi araba?</Text>
+
+            {/* Options */}
             <View style={styles.optionsContainer}>
                {currentQuestion.options.map((opt: any) => {
                     let isSelected = selectedAnswerId === opt.id;
@@ -115,8 +133,6 @@ export default function MultiplayerGameScreen() {
                         } else if (isSelected) {
                             optionStyle.push(styles.optionWrong);
                             textStyle.push(styles.textWrong);
-                        } else {
-                            optionStyle.push(styles.optionDisabled);
                         }
                     } else if (isSelected) {
                         optionStyle.push(styles.optionSelected);
@@ -126,59 +142,68 @@ export default function MultiplayerGameScreen() {
                         <TouchableOpacity
                             key={opt.id}
                             style={optionStyle}
-                            disabled={!!roundResult || !!selectedAnswerId}
+                            disabled={!!roundResult || selectedAnswerId !== null}
                             onPress={() => handleAnswerSubmit(opt.id)}
+                            activeOpacity={0.7}
                         >
                             <Text style={textStyle}>{opt.content}</Text>
                         </TouchableOpacity>
                     );
                })}
+               
+               {/* Skip Button */}
+               <TouchableOpacity 
+                   style={styles.skipButton} 
+                   onPress={() => handleAnswerSubmit(-1)} 
+                   disabled={!!roundResult || selectedAnswerId !== null}
+               >
+                   <Text style={styles.skipText}>Pas / Geç</Text>
+               </TouchableOpacity>
             </View>
-
-            {selectedAnswerId && !roundResult && (
-                <View style={styles.waitingOpponent}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                    <Text style={styles.waitingOppText}>Rakibin cevabı bekleniyor...</Text>
+            
+            {amIWaitingForOpponent && (
+                <View style={styles.waitingOverlay}>
+                    <ActivityIndicator size="small" color={Colors.primary} style={{marginRight: 10}}/>
+                    <Text style={{color: Colors.white, fontWeight: '600'}}>Rakip bekleniyor...</Text>
                 </View>
             )}
-            
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: Colors.bg },
-    center: { justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: Spacing.md, color: Colors.textPrimary, fontWeight: '700' },
-    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.xl },
-    scorePill: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.primaryMuted, paddingHorizontal: Spacing.lg, paddingVertical: Spacing.sm, borderRadius: Radius.full, gap: Spacing.sm },
-    oppScorePill: { backgroundColor: Colors.errorMuted },
-    scoreName: { color: Colors.primary, fontWeight: '700', fontSize: FontSizes.sm },
-    scoreValue: { color: Colors.textPrimary, fontWeight: '900', fontSize: FontSizes.lg },
-    vsText: { color: Colors.textMuted, fontWeight: '900', fontSize: FontSizes.xl, fontStyle: 'italic' },
-    progressContainer: { alignItems: 'center', marginBottom: Spacing.sm },
-    progressText: { color: Colors.textMuted, fontWeight: '700', fontSize: FontSizes.sm },
-    imageContainer: { marginHorizontal: Spacing.xl, height: 220, borderRadius: Radius.xl, overflow: 'hidden', ...Shadows.md, marginBottom: Spacing['2xl'] },
+    header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, paddingTop: Spacing.xl },
+    exitBtn: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.borderLight, backgroundColor: Colors.bgCard },
+    exitBtnText: { color: Colors.textSecondary, fontSize: FontSizes.sm, fontWeight: '600' },
+    scoreText: { color: Colors.textSecondary, fontSize: FontSizes.base, fontWeight: '700' },
+    timerPill: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.bgCard, borderWidth: 1, borderColor: '#1F2937' },
+    timerText: { color: Colors.white, fontSize: FontSizes.sm, fontWeight: '800' },
+    progressContainer: { paddingHorizontal: Spacing.xl, marginTop: Spacing.lg, marginBottom: Spacing['2xl'] },
+    progressTrack: { height: 4, backgroundColor: '#1E293B', borderRadius: 2 },
+    progressFill: { height: '100%', backgroundColor: Colors.primary, borderRadius: 2 },
+    imageContainer: { marginHorizontal: Spacing.xl, height: 240, borderRadius: Radius['2xl'], overflow: 'hidden', ...Shadows.lg, marginBottom: Spacing['3xl'] },
     image: { width: '100%', height: '100%' },
-    optionsContainer: { paddingHorizontal: Spacing.xl, gap: Spacing.md },
-    optionButton: { backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.lg, borderWidth: 2, borderColor: Colors.border, alignItems: 'center' },
-    optionText: { color: Colors.textPrimary, fontWeight: '600', fontSize: FontSizes.base },
-    optionSelected: { borderColor: Colors.primary, backgroundColor: Colors.primaryMuted },
-    optionCorrect: { borderColor: Colors.success, backgroundColor: Colors.successMuted },
+    questionTitle: { color: Colors.white, fontSize: FontSizes['2xl'], fontWeight: '800', textAlign: 'center', marginBottom: Spacing['3xl'] },
+    optionsContainer: { paddingHorizontal: Spacing.xl, gap: Spacing.lg },
+    optionButton: { backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.borderLight, alignItems: 'center' },
+    optionText: { color: Colors.textSecondary, fontWeight: '700', fontSize: FontSizes.base },
+    optionSelected: { borderColor: Colors.primary, backgroundColor: 'rgba(14, 165, 233, 0.1)' },
+    optionCorrect: { borderColor: Colors.success, backgroundColor: 'rgba(16, 185, 129, 0.1)' },
     textCorrect: { color: Colors.success },
-    optionWrong: { borderColor: Colors.error, backgroundColor: Colors.errorMuted },
+    optionWrong: { borderColor: Colors.error, backgroundColor: 'rgba(244, 63, 94, 0.1)' },
     textWrong: { color: Colors.error },
-    optionDisabled: { opacity: 0.5 },
-    waitingOpponent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: Spacing.xl, gap: Spacing.sm },
-    waitingOppText: { color: Colors.textMuted, fontWeight: '600' },
+    skipButton: { backgroundColor: Colors.bgCard, padding: Spacing.lg, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.borderLight, alignItems: 'center', marginTop: Spacing.xl },
+    skipText: { color: Colors.textMuted, fontWeight: '600', fontSize: FontSizes.base },
+    waitingOverlay: { position: 'absolute', bottom: 40, alignSelf: 'center', flexDirection: 'row', backgroundColor: '#181F2B', paddingHorizontal: 24, paddingVertical: 12, borderRadius: 30, borderWidth: 1, borderColor: Colors.primaryDark },
+    
     // Modal
-    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
-    modalContent: { backgroundColor: Colors.bgCard, width: '100%', padding: Spacing['3xl'], borderRadius: Radius['2xl'], alignItems: 'center', ...Shadows.lg },
-    resultTitle: { color: Colors.textPrimary, fontSize: FontSizes['2xl'], fontWeight: '900', marginVertical: Spacing.md },
+    modalBg: { flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center', padding: Spacing.xl },
+    modalContent: { backgroundColor: Colors.bgCard, width: '100%', padding: Spacing['3xl'], borderRadius: Radius['2xl'], alignItems: 'center', borderWidth: 1, borderColor: Colors.primary },
+    resultTitle: { color: Colors.white, fontSize: FontSizes['3xl'], fontWeight: '900', marginVertical: Spacing.md },
     resultScores: { marginVertical: Spacing.lg, alignItems: 'center' },
-    resultScoreText: { color: Colors.textSecondary, fontSize: FontSizes.lg, fontWeight: '700', marginBottom: 4 },
-    winnerText: { color: Colors.primary, fontSize: FontSizes.xl, fontWeight: '800', marginBottom: Spacing.sm },
-    rewardText: { color: Colors.success, fontSize: FontSizes.base, fontWeight: '700', marginBottom: Spacing['2xl'] },
+    resultScoreText: { color: Colors.primaryLight, fontSize: FontSizes.lg, fontWeight: '700', marginBottom: 4 },
+    winnerText: { color: Colors.warning, fontSize: FontSizes.xl, fontWeight: '800', marginBottom: Spacing['2xl'] },
     exitButton: { backgroundColor: Colors.primary, width: '100%', padding: Spacing.md, borderRadius: Radius.lg, alignItems: 'center' },
-    exitButtonText: { color: Colors.white, fontWeight: '700', fontSize: FontSizes.base }
+    exitButtonText: { color: Colors.white, fontWeight: '800', fontSize: FontSizes.base }
 });

@@ -1,20 +1,12 @@
-import React, { useRef, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Animated,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, TouchableOpacity, SafeAreaView, ScrollView, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useAuthStore } from '../store/useAuthStore';
 import apiClient from '../api/client';
-import { Ionicons } from '@expo/vector-icons';
-import { Colors, Gradients, Radius, Shadows, Spacing, FontSizes } from '../theme';
+import { Ionicons, FontAwesome5 } from '@expo/vector-icons';
+import { Colors, Radius, Shadows, Spacing, FontSizes } from '../theme';
 
 type RootStackParamList = {
   Home: undefined;
@@ -25,412 +17,196 @@ type RootStackParamList = {
   Profile: undefined;
 };
 
-type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 export default function HomeScreen() {
-  const logout = useAuthStore((state) => state.logout);
   const username = useAuthStore((state) => state.username);
-  const navigation = useNavigation<HomeScreenNavigationProp>();
-
-  const [userStats, setUserStats] = useState<{ highScore: number; gameCount: number } | null>(null);
-
-  // Staggered animations
-  const headerAnim = useRef(new Animated.Value(0)).current;
-  const heroAnim = useRef(new Animated.Value(0)).current;
-  const statsAnim = useRef(new Animated.Value(0)).current;
-  const menuAnim = useRef(new Animated.Value(0)).current;
-  const headerSlide = useRef(new Animated.Value(-20)).current;
-  const heroSlide = useRef(new Animated.Value(30)).current;
-  const statsSlide = useRef(new Animated.Value(30)).current;
-  const menuSlide = useRef(new Animated.Value(30)).current;
+  const navigation = useNavigation<NavigationProp>();
+  const [userStats, setUserStats] = useState({ points: 0, rank: '#--', games: 0, winRate: '0%', streak: 0, rankName: '' });
+  const [weeklyLeaders, setWeeklyLeaders] = useState<any[]>([]);
 
   useEffect(() => {
-    const animate = (anim: Animated.Value, slide: Animated.Value, delay: number) =>
-      Animated.parallel([
-        Animated.timing(anim, { toValue: 1, duration: 500, delay, useNativeDriver: true }),
-        Animated.timing(slide, { toValue: 0, duration: 500, delay, useNativeDriver: true }),
-      ]);
-
-    Animated.stagger(100, [
-      animate(headerAnim, headerSlide, 0),
-      animate(heroAnim, heroSlide, 0),
-      animate(statsAnim, statsSlide, 0),
-      animate(menuAnim, menuSlide, 0),
-    ]).start();
-
-    // current-user endpoint'inden gerçek stats çek
     const fetchCurrentUser = async () => {
       try {
         const res = await apiClient.get('/Users/current-user');
         const data = res.data;
-        // CurrentUserDto: { userName, totalPoint, gameCount }
         setUserStats({
-          highScore: data?.totalPoint ?? 0,
-          gameCount: data?.gameCount ?? 0,
+          points: data?.totalPoint ?? 0,
+          rank: data?.rankName || 'Çaylak Şoför', // Dynamic Rank
+          games: data?.gameCount ?? 0,
+          winRate: '87%', // Mock
+          streak: 12, // Mock 
+          rankName: data?.rankName || ''
         });
-      } catch (e) {
-        // Sessizce devam et — stats gösterilmez
-      }
+      } catch (e) {}
     };
+
+    const fetchWeeklyLeaders = async () => {
+      try {
+        const res = await apiClient.get('/Users/leaderboard?period=weekly&Page=1&Size=3');
+        setWeeklyLeaders(res.data.items || []);
+      } catch (e) {}
+    };
+
     fetchCurrentUser();
+    fetchWeeklyLeaders();
   }, []);
+
+  const getEmojiForRank = (index: number) => {
+      if (index === 0) return '🏎️';
+      if (index === 1) return '🚙';
+      if (index === 2) return '🛻';
+      return '🏁';
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+      {/* Scrollable Content */}
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        
         {/* Header */}
-        <Animated.View style={[styles.header, {
-          opacity: headerAnim,
-          transform: [{ translateY: headerSlide }],
-        }]}>
+        <View style={styles.header}>
           <View>
-            <Text style={styles.welcomeLabel}>Hoş geldin,</Text>
-            <Text style={styles.welcomeName}>{username || 'Oyuncu'} 🏎️</Text>
+            <Text style={styles.logoText}>CarGuessr</Text>
+            <Text style={styles.welcomeText}>Tekrar Hoş Geldin!</Text>
           </View>
-          <TouchableOpacity
-            onPress={() => logout()}
-            style={styles.logoutButton}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="log-out-outline" size={22} color={Colors.error} />
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')} style={styles.avatarCircle}>
+             <LinearGradient colors={['#6366F1', '#3B82F6']} style={styles.avatarGradient}>
+                <Ionicons name="flash" size={20} color={Colors.warning} />
+             </LinearGradient>
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
-        {/* Hero Card */}
-        <Animated.View style={{
-          opacity: heroAnim,
-          transform: [{ translateY: heroSlide }],
-        }}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('Game')}
-          >
-            <LinearGradient
-              colors={Gradients.hero}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.heroCard, Shadows.glow(Colors.primary)]}
-            >
-              {/* Decorative circle */}
-              <View style={styles.heroCircle} />
-              <View style={styles.heroCircleSmall} />
-
-              <View style={styles.heroContent}>
-                <Text style={styles.heroLabel}>GÜNÜN MÜCADELESİ</Text>
-                <Text style={styles.heroTitle}>
-                  Araba Parçalarını{'\n'}Tanıyabilecek misin?
-                </Text>
-                <View style={styles.heroButton}>
-                  <Text style={styles.heroButtonText}>Hemen Başla</Text>
-                  <View style={styles.heroPlayIcon}>
-                    <Ionicons name="play" size={16} color={Colors.primary} />
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Multiplayer Hero Card */}
-        <Animated.View style={{
-          opacity: heroAnim,
-          transform: [{ translateY: heroSlide }],
-          marginTop: Spacing.md
-        }}>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate('MultiplayerLobby')}
-          >
-            <LinearGradient
-              colors={[Colors.primaryDark, Colors.primary]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.heroCard, Shadows.glow(Colors.primary)]}
-            >
-              {/* Decorative circle */}
-              <View style={[styles.heroCircle, { backgroundColor: 'rgba(255,255,255,0.04)' }]} />
-              <View style={[styles.heroCircleSmall, { backgroundColor: 'rgba(255,255,255,0.03)' }]} />
-
-              <View style={styles.heroContent}>
-                <Text style={[styles.heroLabel, { color: Colors.warning }]}>ONLİNE OYUN</Text>
-                <Text style={styles.heroTitle}>
-                  Arkadaşınla{'\n'}Kapışmaya Hazır Mısın?
-                </Text>
-                <View style={styles.heroButton}>
-                  <Text style={styles.heroButtonText}>Oda Kur / Katıl</Text>
-                  <View style={styles.heroPlayIcon}>
-                    <Ionicons name="people" size={16} color={Colors.primary} />
-                  </View>
-                </View>
-              </View>
-            </LinearGradient>
-          </TouchableOpacity>
-        </Animated.View>
-
-        {/* Stats */}
-        <Animated.View style={[styles.statsRow, {
-          opacity: statsAnim,
-          transform: [{ translateY: statsSlide }],
-        }]}>
-          <View style={[styles.statCard, Shadows.sm]}>
-            <View style={[styles.statIconBg, { backgroundColor: Colors.successMuted }]}>
-              <Ionicons name="trophy" size={20} color={Colors.success} />
+        {/* Your Points Card */}
+        <LinearGradient colors={['#23324C', '#1D283E']} style={styles.pointsCard}>
+          <View style={styles.pointsRow}>
+            <View>
+               <Text style={styles.cardLabel}>Puanın</Text>
+               <Text style={styles.pointsValue}>{userStats.points.toLocaleString()}</Text>
             </View>
-            <Text style={styles.statLabel}>EN YÜKSEK SKOR</Text>
-            <Text style={styles.statValue}>
-              {userStats != null ? userStats.highScore.toLocaleString() : '—'}
-            </Text>
+            <View style={{ alignItems: 'flex-end' }}>
+               <Text style={styles.cardLabel}>Dünya Sıralaman</Text>
+               <Text style={styles.rankValue}>{userStats.rank}</Text>
+            </View>
           </View>
-          <View style={[styles.statCard, Shadows.sm]}>
-            <View style={[styles.statIconBg, { backgroundColor: Colors.warningMuted }]}>
-              <Ionicons name="flame" size={20} color={Colors.warning} />
-            </View>
-            <Text style={styles.statLabel}>OYUN SAYISI</Text>
-            <Text style={styles.statValue}>
-              {userStats != null ? userStats.gameCount : '—'}
-            </Text>
-          </View>
-        </Animated.View>
+        </LinearGradient>
 
-        {/* Menu */}
-        <Animated.View style={{
-          opacity: menuAnim,
-          transform: [{ translateY: menuSlide }],
-        }}>
-          <Text style={styles.menuLabel}>MENÜ</Text>
+        {/* Your Stats */}
+        <Text style={styles.sectionTitle}>İstatistiklerin</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+           <View style={styles.statCard}>
+              <Text style={[styles.statNumber, { color: Colors.primaryLight }]}>{userStats.games}</Text>
+              <Text style={styles.statLabel}>Maç Sayısı</Text>
+           </View>
+           <View style={styles.statCard}>
+              <Text style={[styles.statNumber, { color: Colors.success }]}>{userStats.winRate}</Text>
+              <Text style={styles.statLabel}>Kazanma Oranı</Text>
+           </View>
+           <View style={styles.statCard}>
+              <Text style={[styles.statNumber, { color: Colors.error }]}>{userStats.streak} <Text style={{fontSize: 16}}>🔥</Text></Text>
+              <Text style={styles.statLabel}>Kazanma Serisi</Text>
+           </View>
+        </ScrollView>
 
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Leaderboard')}
-            style={[styles.menuItem, Shadows.sm]}
-            activeOpacity={0.7}
-          >
-            <LinearGradient
-              colors={['rgba(99,102,241,0.15)', 'rgba(99,102,241,0.05)']}
-              style={styles.menuIconBg}
-            >
-              <Ionicons name="stats-chart" size={26} color={Colors.primaryLight} />
-            </LinearGradient>
-            <View style={styles.menuTextGroup}>
-              <Text style={styles.menuTitle}>Liderlik Tablosu</Text>
-              <Text style={styles.menuSubtitle}>Dünyanın en iyileri arasına gir.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textDim} />
-          </TouchableOpacity>
+        {/* This Week's Leaders */}
+        <View style={styles.sectionHeader}>
+           <Text style={styles.sectionTitle}>Bu Haftanın Liderleri</Text>
+           <TouchableOpacity onPress={() => navigation.navigate('Leaderboard')}>
+             <Text style={styles.viewAllText}>Tümünü Gör ➔</Text>
+           </TouchableOpacity>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+           {weeklyLeaders.map((leader, idx) => {
+               const isMe = leader.userName === username;
+               let medalBg = Colors.gold;
+               if (idx === 1) medalBg = Colors.silver;
+               else if (idx === 2) medalBg = Colors.bronze;
 
-          <TouchableOpacity
-            style={[styles.menuItem, Shadows.sm]}
-            activeOpacity={0.7}
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <LinearGradient
-              colors={['rgba(148,163,184,0.15)', 'rgba(148,163,184,0.05)']}
-              style={styles.menuIconBg}
-            >
-              <Ionicons name="settings-sharp" size={26} color={Colors.textSecondary} />
-            </LinearGradient>
-            <View style={styles.menuTextGroup}>
-              <Text style={styles.menuTitle}>Profil & Ayarlar</Text>
-              <Text style={styles.menuSubtitle}>Hesabını yönet ve kişiselleştir.</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={20} color={Colors.textDim} />
-          </TouchableOpacity>
-        </Animated.View>
+               return (
+                   <View key={leader.id || idx} style={[styles.leaderCard, isMe && { borderColor: Colors.primary, borderWidth: 1 }]}>
+                      <View style={styles.leaderIconRow}>
+                         {isMe ? <Ionicons name="flash" size={20} color={Colors.warning} /> : <Text style={{fontSize: 20}}>{getEmojiForRank(idx)}</Text>}
+                         <View style={[styles.medalIcon, {backgroundColor: medalBg}]}><Text style={styles.medalText}>{idx + 1}</Text></View>
+                      </View>
+                      <Text style={styles.leaderName}>{leader.userName}</Text>
+                      <Text style={styles.leaderScore}>{leader.totalScored}</Text>
+                   </View>
+               );
+           })}
+           {weeklyLeaders.length === 0 && (
+               <Text style={{color: Colors.textMuted, margin: 20}}>Liderler yükleniyor...</Text>
+           )}
+        </ScrollView>
+
+        {/* Spacer for bottom button */}
+        <View style={{ height: 100 }} />
       </ScrollView>
+
+      {/* Floating Start Game Button */}
+      <View style={styles.floatingButtonContainer}>
+         <TouchableOpacity activeOpacity={0.8} onPress={() => navigation.navigate('Game')} style={styles.startGameButton}>
+            <LinearGradient colors={['#0ea5e9', '#0284c7']} style={styles.startGameGradient}>
+               <FontAwesome5 name="gamepad" size={20} color={Colors.white} />
+               <Text style={styles.startGameText}>Oyuna Başla</Text>
+            </LinearGradient>
+         </TouchableOpacity>
+      </View>
+
+      {/* Mock Bottom Navigation */}
+      <View style={styles.bottomNav}>
+         <TouchableOpacity style={styles.navItem}>
+             <Ionicons name="home" size={24} color={Colors.primary} />
+             <Text style={[styles.navText, { color: Colors.primary }]}>Ana Sayfa</Text>
+         </TouchableOpacity>
+         <TouchableOpacity style={styles.navItem}>
+             <Ionicons name="target" size={24} color={Colors.error} />
+             <Text style={styles.navText}>Günlük</Text>
+         </TouchableOpacity>
+         <TouchableOpacity onPress={() => navigation.navigate('MultiplayerLobby')} style={styles.navItem}>
+             <Ionicons name="people" size={24} color={Colors.primaryDark} />
+             <Text style={styles.navText}>Online</Text>
+         </TouchableOpacity>
+         <TouchableOpacity onPress={() => navigation.navigate('Leaderboard')} style={styles.navItem}>
+             <Ionicons name="trophy" size={24} color={Colors.warning} />
+             <Text style={styles.navText}>Sıralama</Text>
+         </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.bg,
-  },
-  scroll: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingHorizontal: Spacing['2xl'],
-    paddingTop: Spacing['4xl'],
-    paddingBottom: Spacing['4xl'],
-  },
-
-  // Header
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing['3xl'],
-  },
-  welcomeLabel: {
-    fontSize: FontSizes.sm,
-    fontWeight: '600',
-    color: Colors.textMuted,
-    marginBottom: 2,
-  },
-  welcomeName: {
-    fontSize: FontSizes['3xl'],
-    fontWeight: '900',
-    color: Colors.textPrimary,
-    letterSpacing: -0.5,
-  },
-  logoutButton: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.lg,
-    backgroundColor: Colors.errorMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(244, 63, 94, 0.2)',
-  },
-
-  // Hero Card
-  heroCard: {
-    borderRadius: Radius['3xl'],
-    padding: Spacing['2xl'],
-    marginBottom: Spacing['2xl'],
-    overflow: 'hidden',
-    minHeight: 180,
-    justifyContent: 'flex-end',
-  },
-  heroCircle: {
-    position: 'absolute',
-    top: -30,
-    right: -30,
-    width: 140,
-    height: 140,
-    borderRadius: 70,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-  },
-  heroCircleSmall: {
-    position: 'absolute',
-    bottom: -20,
-    left: -20,
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-  },
-  heroContent: {
-    position: 'relative',
-    zIndex: 1,
-  },
-  heroLabel: {
-    fontSize: FontSizes.xs,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.6)',
-    letterSpacing: 2,
-    marginBottom: Spacing.sm,
-  },
-  heroTitle: {
-    fontSize: FontSizes['2xl'],
-    fontWeight: '900',
-    color: Colors.white,
-    lineHeight: 32,
-    marginBottom: Spacing.xl,
-  },
-  heroButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.white,
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.xl,
-    borderRadius: Radius.lg,
-    gap: Spacing.sm,
-  },
-  heroButtonText: {
-    fontSize: FontSizes.base,
-    fontWeight: '700',
-    color: Colors.primaryDark,
-  },
-  heroPlayIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.primaryMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  // Stats
-  statsRow: {
-    flexDirection: 'row',
-    gap: Spacing.lg,
-    marginBottom: Spacing['3xl'],
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.xl,
-    padding: Spacing.xl,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statIconBg: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.md,
-  },
-  statLabel: {
-    fontSize: FontSizes.xs,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    letterSpacing: 1,
-    marginBottom: Spacing.xs,
-  },
-  statValue: {
-    fontSize: FontSizes.xl,
-    fontWeight: '900',
-    color: Colors.textPrimary,
-  },
-
-  // Menu
-  menuLabel: {
-    fontSize: FontSizes.xs,
-    fontWeight: '700',
-    color: Colors.textMuted,
-    letterSpacing: 2,
-    marginBottom: Spacing.lg,
-    marginLeft: Spacing.xs,
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.bgCard,
-    borderRadius: Radius.xl,
-    padding: Spacing.lg,
-    marginBottom: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  menuIconBg: {
-    width: 52,
-    height: 52,
-    borderRadius: Radius.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.lg,
-  },
-  menuTextGroup: {
-    flex: 1,
-  },
-  menuTitle: {
-    fontSize: FontSizes.base,
-    fontWeight: '700',
-    color: Colors.textPrimary,
-    marginBottom: 2,
-  },
-  menuSubtitle: {
-    fontSize: FontSizes.sm,
-    color: Colors.textMuted,
-    fontWeight: '500',
-  },
+  container: { flex: 1, backgroundColor: Colors.bg },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 120 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: Spacing.xl, paddingTop: Spacing['2xl'] },
+  logoText: { color: Colors.primary, fontSize: FontSizes['2xl'], fontWeight: '800', letterSpacing: 0.5 },
+  welcomeText: { color: Colors.textSecondary, fontSize: FontSizes.sm, marginTop: 4 },
+  avatarCircle: { width: 44, height: 44, borderRadius: 22, overflow: 'hidden' },
+  avatarGradient: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  pointsCard: { marginHorizontal: Spacing.xl, borderRadius: Radius.xl, padding: Spacing['2xl'], marginBottom: Spacing['2xl'], ...Shadows.md },
+  pointsRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' },
+  cardLabel: { color: Colors.textSecondary, fontSize: FontSizes.sm, fontWeight: '600', marginBottom: Spacing.xs },
+  pointsValue: { color: Colors.primaryLight, fontSize: 36, fontWeight: '300' },
+  rankValue: { color: Colors.primary, fontSize: 36, fontWeight: '400' },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: Spacing.xl, marginTop: Spacing.lg },
+  sectionTitle: { color: Colors.textSecondary, fontSize: FontSizes.sm, fontWeight: '700', paddingHorizontal: Spacing.xl, marginBottom: Spacing.md },
+  viewAllText: { color: Colors.primary, fontSize: FontSizes.sm, fontWeight: '700' },
+  horizontalScroll: { paddingHorizontal: Spacing.xl, gap: Spacing.md, paddingBottom: Spacing.sm },
+  statCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.xl, minWidth: 110, alignItems: 'center', borderWidth: 1, borderColor: '#1F2937' },
+  statNumber: { fontSize: 28, fontWeight: '300', marginBottom: Spacing.xs },
+  statLabel: { color: Colors.textMuted, fontSize: FontSizes.xs, fontWeight: '600' },
+  leaderCard: { backgroundColor: Colors.bgCard, borderRadius: Radius.lg, padding: Spacing.xl, minWidth: 140, borderWidth: 1, borderColor: '#1F2937' },
+  leaderIconRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.lg },
+  medalIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#F59E0B', justifyContent: 'center', alignItems: 'center' },
+  medalText: { color: Colors.white, fontSize: 10, fontWeight: '900' },
+  leaderName: { color: Colors.white, fontSize: FontSizes.sm, fontWeight: '700', marginBottom: 4 },
+  leaderScore: { color: Colors.primaryLight, fontSize: FontSizes.lg, fontWeight: '300' },
+  floatingButtonContainer: { position: 'absolute', bottom: 85, left: 0, right: 0, paddingHorizontal: Spacing.xl },
+  startGameButton: { borderRadius: Radius.lg, overflow: 'hidden', ...Shadows.glow(Colors.primary) },
+  startGameGradient: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', paddingVertical: Spacing.lg, gap: Spacing.md },
+  startGameText: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '700' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 75, backgroundColor: Colors.bgCard, flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center', borderTopWidth: 1, borderTopColor: Colors.border },
+  navItem: { alignItems: 'center', justifyContent: 'center' },
+  navText: { color: Colors.textMuted, fontSize: 10, fontWeight: '600', marginTop: 4 }
 });

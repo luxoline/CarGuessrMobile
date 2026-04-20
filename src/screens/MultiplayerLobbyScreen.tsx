@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ActivityIndicator, SafeAreaView, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../store/useAuthStore';
 import { useMultiplayerStore } from '../store/useMultiplayerStore';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Radius, Spacing, Shadows, FontSizes } from '../theme';
@@ -23,36 +22,64 @@ export default function MultiplayerLobbyScreen() {
       }
     };
     startConnection();
-    // Don't disconnect on unmount — the connection must persist
-    // when navigating to MultiplayerGameScreen
   }, [token]);
 
   useEffect(() => {
     if (isGameStarted) {
-      navigation.replace('MultiplayerGame'); // Navigate to the game screen immediately when started
+      navigation.replace('MultiplayerGame');
     }
   }, [isGameStarted]);
 
   if (isConnecting) {
     return (
-      <View style={[styles.container, styles.center]}>
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Sunucuya bağlanılıyor...</Text>
       </View>
     );
+  }
+
+  // If matched or waiting for code
+  if (isMatchmaking || lobbyCode) {
+      return (
+          <SafeAreaView style={styles.container}>
+             <View style={styles.header}>
+               <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+                 <Text style={styles.backButtonText}>← Geri</Text>
+               </TouchableOpacity>
+             </View>
+             <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', paddingHorizontal: Spacing.xl }]}>
+                 {isMatchmaking ? (
+                     <>
+                       <ActivityIndicator size="large" color={Colors.warning} style={{ marginBottom: 30, transform: [{ scale: 1.5 }] }} />
+                       <Text style={{fontSize: 24, fontWeight: '700', color: Colors.white, marginBottom: 10}}>Eşleşme Aranıyor...</Text>
+                       <Text style={{color: Colors.textMuted}}>Dünya genelinden oyuncular aranıyor...</Text>
+                     </>
+                 ) : (
+                     <>
+                        <View style={{backgroundColor: Colors.bgCard, padding: 30, borderRadius: 20, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', width: '100%'}}>
+                            <Text style={{color: Colors.textSecondary, marginBottom: 10, fontWeight: '600'}}>ODA KODU</Text>
+                            <Text style={{color: Colors.primaryLight, fontSize: 40, fontWeight: '800', letterSpacing: 5}}>{lobbyCode}</Text>
+                        </View>
+                        <ActivityIndicator style={{marginTop: 40, marginBottom: 20}} />
+                        <Text style={{color: Colors.white, fontSize: 18}}>Arkadaşının katılması bekleniyor...</Text>
+                     </>
+                 )}
+             </View>
+          </SafeAreaView>
+      );
   }
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+          <Text style={styles.backButtonText}>← Geri</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Online Kapışma</Text>
-        <View style={{ width: 44 }} />
+        <Text style={styles.headerTitle}>Oyun Modu</Text>
+        <View style={{ width: 80 }} />
       </View>
 
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content}>
         {error && (
             <View style={styles.errorBox}>
                 <Ionicons name="alert-circle" size={20} color={Colors.error} />
@@ -60,101 +87,118 @@ export default function MultiplayerLobbyScreen() {
             </View>
         )}
 
-        {isMatchmaking ? (
-            <View style={styles.waitingContainer}>
-               <ActivityIndicator size="large" color={Colors.warning} style={{ marginVertical: 30, transform: [{ scale: 1.5 }] }} />
-               <Text style={[styles.waitingText, { color: Colors.warning }]}>Rakip Aranıyor...</Text>
-               <Text style={styles.waitingSub}>Dünya genelinde eşleşebileceğin bir oyuncu aranıyor. Lütfen bekle.</Text>
-            </View>
-        ) : !lobbyCode ? (
-            <View style={styles.actionsContainer}>
-               {/* Quick Match Card */}
-               <TouchableOpacity style={[styles.actionCard, { marginBottom: Spacing.xl }]} onPress={findRandomMatch}>
-                 <LinearGradient colors={[Colors.warning, Colors.gold]} style={[styles.actionCardGradient, { paddingVertical: Spacing.lg }]}>
-                    <Ionicons name="flash" size={32} color={Colors.white} />
-                    <Text style={[styles.actionCardTitle, { fontSize: FontSizes.xl }]}>Hemen Oyuna Başla</Text>
-                    <Text style={styles.actionCardSub}>Rastgele bir rakiple eşleş</Text>
-                 </LinearGradient>
+        <LinearGradient colors={['#23324C', '#1D283E']} style={styles.quickMatchCard}>
+           <Ionicons name="flash" size={48} color={Colors.warning} style={{alignSelf: 'center', marginBottom: Spacing.sm}} />
+           <Text style={styles.qmTitle}>Hızlı Eşleşme</Text>
+           <Text style={styles.qmSub}>Rastgele oyuncularla rekabet et ve puan kazan</Text>
+
+           <View style={styles.qmStats}>
+               <View style={styles.qmStatItem}>
+                   <Text style={styles.qmStatLabel}>Ort. Süre</Text>
+                   <Text style={[styles.qmStatValue, {color: Colors.success}]}>~15s</Text>
+               </View>
+               <View style={styles.qmDivider} />
+               <View style={styles.qmStatItem}>
+                   <Text style={styles.qmStatLabel}>Oyuncu</Text>
+                   <Text style={[styles.qmStatValue, {color: Colors.primaryLight}]}>234 çevrimiçi</Text>
+               </View>
+           </View>
+
+           <TouchableOpacity activeOpacity={0.8} onPress={findRandomMatch} style={styles.findMatchBtn}>
+               <Text style={styles.findMatchBtnText}>Eşleşme Bul</Text>
+           </TouchableOpacity>
+        </LinearGradient>
+
+        <View style={styles.orSection}>
+            <View style={styles.orLine} />
+            <Text style={styles.orText}>VEYA</Text>
+            <View style={styles.orLine} />
+        </View>
+
+        <Text style={styles.privateTitle}>Özel Oda (Puan Verilmez)</Text>
+
+        <View style={styles.privateCard}>
+            <View style={styles.privateRow}>
+               <Ionicons name="game-controller" size={24} color="#8B5CF6" />
+               <View style={{flex: 1, marginLeft: Spacing.md}}>
+                   <Text style={styles.privateItemTitle}>Özel Oda Kur</Text>
+                   <Text style={styles.privateItemSub}>Arkadaşlarınla oyna</Text>
+               </View>
+               <TouchableOpacity style={styles.smallBtn} onPress={createLobby}>
+                   <Text style={styles.smallBtnText}>Kur</Text>
                </TouchableOpacity>
+            </View>
+        </View>
 
-               <TouchableOpacity style={styles.actionCard} onPress={createLobby}>
-                 <LinearGradient colors={[Colors.primary, Colors.primaryLight]} style={[styles.actionCardGradient, { paddingVertical: Spacing.lg }]}>
-                    <Ionicons name="add-circle" size={40} color={Colors.white} />
-                    <Text style={styles.actionCardTitle}>Oda Kur</Text>
-                    <Text style={styles.actionCardSub}>Arkadaşını davet et</Text>
-                 </LinearGradient>
-               </TouchableOpacity>
-
-               <View style={styles.divider}>
-                   <View style={styles.dividerLine} />
-                   <Text style={styles.dividerText}>VEYA</Text>
-                   <View style={styles.dividerLine} />
-               </View>
-
-               <View style={styles.joinContainer}>
-                   <Text style={styles.joinLabel}>Oda Kodu</Text>
-                   <TextInput
-                       style={styles.input}
-                       placeholder="6 Haneli Kod"
-                       placeholderTextColor={Colors.textMuted}
-                       value={inputCode}
-                       onChangeText={(text) => setInputCode(text.toUpperCase())}
-                       maxLength={6}
-                       autoCapitalize="characters"
-                   />
-                   <TouchableOpacity
-                       style={[styles.button, (!inputCode || inputCode.length !== 6) && styles.buttonDisabled]}
-                       onPress={() => joinLobby(inputCode)}
-                       disabled={!inputCode || inputCode.length !== 6}
-                   >
-                       <Text style={styles.buttonText}>Odaya Katıl</Text>
-                   </TouchableOpacity>
+        <View style={[styles.privateCard, {marginTop: Spacing.md}]}>
+            <View style={styles.privateRow}>
+               <Ionicons name="link" size={24} color="#C4B5FD" />
+               <View style={{flex: 1, marginLeft: Spacing.md}}>
+                   <Text style={styles.privateItemTitle}>Özel Odaya Katıl</Text>
+                   <Text style={styles.privateItemSub}>Oda kodunu gir</Text>
                </View>
             </View>
-        ) : (
-            <View style={styles.waitingContainer}>
-               <View style={styles.codeBox}>
-                  <Text style={styles.codeLabel}>Lobi Kodu</Text>
-                  <Text style={styles.codeText}>{lobbyCode}</Text>
-               </View>
-               <ActivityIndicator size="large" color={Colors.primary} style={{ marginVertical: 30 }} />
-               <Text style={styles.waitingText}>Rakip bekleniyor...</Text>
-               <Text style={styles.waitingSub}>Bu kodu arkadaşınla paylaş, odaya katılsın.</Text>
+            <View style={styles.inputRow}>
+                <TextInput
+                    style={styles.input}
+                    placeholder="CAR-XXXX"
+                    placeholderTextColor={Colors.textMuted}
+                    value={inputCode}
+                    onChangeText={(t) => setInputCode(t.toUpperCase())}
+                    maxLength={6}
+                    autoCapitalize="characters"
+                />
+                <TouchableOpacity 
+                   style={[styles.joinBtn, (!inputCode || inputCode.length !== 6) && {opacity: 0.5}]} 
+                   onPress={() => joinLobby(inputCode)}
+                   disabled={!inputCode || inputCode.length !== 6}
+                >
+                    <Text style={styles.smallBtnText}>Katıl</Text>
+                </TouchableOpacity>
             </View>
-        )}
-      </View>
+        </View>
+
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  center: { justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: Spacing.md, color: Colors.textMuted, fontSize: FontSizes.base },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, height: 60 },
-  backButton: { width: 44, height: 44, borderRadius: 22, backgroundColor: Colors.bgCard, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: Colors.border },
-  headerTitle: { fontSize: FontSizes.lg, fontWeight: '700', color: Colors.textPrimary },
-  content: { flex: 1, padding: Spacing.xl },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.xl, paddingTop: Spacing.xl, marginBottom: Spacing.xl },
+  backButton: { borderWidth: 1, borderColor: Colors.border, paddingHorizontal: 16, paddingVertical: 8, borderRadius: Radius.full, backgroundColor: Colors.bgCard },
+  backButtonText: { color: Colors.textSecondary, fontSize: FontSizes.sm, fontWeight: '600' },
+  headerTitle: { color: Colors.white, fontSize: FontSizes.xl, fontWeight: '700' },
+  content: { paddingHorizontal: Spacing.xl, paddingBottom: 40 },
   errorBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.errorMuted, padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.lg, gap: Spacing.sm },
   errorText: { color: Colors.error, fontSize: FontSizes.sm, fontWeight: '500' },
-  actionsContainer: { flex: 1, justifyContent: 'center' },
-  actionCard: { borderRadius: Radius.xl, overflow: 'hidden', ...Shadows.md },
-  actionCardGradient: { padding: Spacing['2xl'], alignItems: 'center' },
-  actionCardTitle: { color: Colors.white, fontSize: FontSizes['2xl'], fontWeight: '800', marginTop: Spacing.md },
-  actionCardSub: { color: 'rgba(255,255,255,0.8)', fontSize: FontSizes.sm, marginTop: Spacing.xs },
-  divider: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing['2xl'] },
-  dividerLine: { flex: 1, height: 1, backgroundColor: Colors.border },
-  dividerText: { marginHorizontal: Spacing.md, color: Colors.textMuted, fontWeight: '700', fontSize: FontSizes.xs },
-  joinContainer: { backgroundColor: Colors.bgCard, padding: Spacing.xl, borderRadius: Radius.xl, borderWidth: 1, borderColor: Colors.border },
-  joinLabel: { fontSize: FontSizes.sm, fontWeight: '600', color: Colors.textMuted, marginBottom: Spacing.xs },
-  input: { backgroundColor: Colors.bg, borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.md, padding: Spacing.md, fontSize: FontSizes.lg, fontWeight: '700', color: Colors.textPrimary, textAlign: 'center', letterSpacing: 5, marginBottom: Spacing.lg },
-  button: { backgroundColor: Colors.primary, padding: Spacing.md, borderRadius: Radius.md, alignItems: 'center' },
-  buttonDisabled: { opacity: 0.5 },
-  buttonText: { color: Colors.white, fontSize: FontSizes.base, fontWeight: '700' },
-  waitingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  codeBox: { backgroundColor: Colors.primaryMuted, padding: Spacing['2xl'], borderRadius: Radius['2xl'], alignItems: 'center', width: '100%', borderWidth: 1, borderColor: Colors.primary },
-  codeLabel: { color: Colors.primary, fontSize: FontSizes.sm, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 2, marginBottom: Spacing.sm },
-  codeText: { color: Colors.primaryDark, fontSize: 48, fontWeight: '900', letterSpacing: 10 },
-  waitingText: { fontSize: FontSizes.xl, fontWeight: '700', color: Colors.textPrimary, marginBottom: Spacing.sm },
-  waitingSub: { fontSize: FontSizes.sm, color: Colors.textMuted, textAlign: 'center', paddingHorizontal: Spacing.xl },
+  
+  // Quick Match
+  quickMatchCard: { padding: Spacing['3xl'], borderRadius: Radius['2xl'], borderWidth: 1, borderColor: Colors.borderLight, ...Shadows.lg },
+  qmTitle: { color: Colors.white, fontSize: FontSizes['2xl'], fontWeight: '800', textAlign: 'center', marginBottom: 4 },
+  qmSub: { color: Colors.textSecondary, textAlign: 'center', fontSize: FontSizes.sm },
+  qmStats: { flexDirection: 'row', justifyContent: 'center', marginVertical: Spacing['2xl'] },
+  qmStatItem: { alignItems: 'center', paddingHorizontal: 20 },
+  qmDivider: { width: 1, backgroundColor: Colors.borderLight },
+  qmStatLabel: { color: Colors.textMuted, fontSize: FontSizes.xs, marginBottom: 4 },
+  qmStatValue: { fontWeight: '700', fontSize: FontSizes.md },
+  findMatchBtn: { backgroundColor: Colors.primary, paddingVertical: 18, borderRadius: Radius.lg, alignItems: 'center', ...Shadows.glow(Colors.primary) },
+  findMatchBtnText: { color: Colors.white, fontSize: FontSizes.lg, fontWeight: '700' },
+
+  // OR
+  orSection: { flexDirection: 'row', alignItems: 'center', marginVertical: Spacing['2xl'] },
+  orLine: { flex: 1, height: 1, backgroundColor: Colors.border },
+  orText: { color: Colors.textMuted, marginHorizontal: Spacing.md, fontSize: 10, fontWeight: '600' },
+
+  // Private Match
+  privateTitle: { color: Colors.textSecondary, fontSize: FontSizes.sm, fontWeight: '600', marginBottom: Spacing.lg },
+  privateCard: { backgroundColor: '#181F2B', borderRadius: Radius.xl, padding: Spacing.xl, borderWidth: 1, borderColor: Colors.border },
+  privateRow: { flexDirection: 'row', alignItems: 'center' },
+  privateItemTitle: { color: Colors.white, fontWeight: '700', fontSize: FontSizes.base },
+  privateItemSub: { color: Colors.textMuted, fontSize: FontSizes.xs, marginTop: 2 },
+  smallBtn: { backgroundColor: '#23324C', paddingHorizontal: 16, paddingVertical: 10, borderRadius: Radius.full, borderWidth: 1, borderColor: Colors.borderLight },
+  smallBtnText: { color: Colors.textPrimary, fontWeight: '600', fontSize: FontSizes.sm },
+  inputRow: { flexDirection: 'row', marginTop: Spacing.lg, gap: Spacing.sm },
+  input: { flex: 1, backgroundColor: '#131924', borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.lg, paddingHorizontal: Spacing.md, color: Colors.white, fontSize: FontSizes.base },
+  joinBtn: { backgroundColor: '#23324C', justifyContent: 'center', paddingHorizontal: 24, borderRadius: Radius.lg, borderWidth: 1, borderColor: Colors.borderLight }
 });
